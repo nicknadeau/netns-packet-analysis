@@ -103,13 +103,22 @@ rm "$ARG_DUMP_DIR"/* &>/dev/null
 # NOTE: Every tcpdump instance writes to stderr even under successful conditions. This looks confusing when running the script, because you don't get your prompt back until you press enter.
 # To avoid this confusion for people using this, but also retaining the error reporting, we pipe stderr to a separate file in the dump dir.
 
-sudo ip netns exec "$ARG_ROUTE_NAME" tcpdump --interface vswitch ${@:$ARG_TCPDUMP_ARGS_INDEX} -s 65535 > "$ARG_DUMP_DIR"/stdout_vswitch 2>"$ARG_DUMP_DIR"/stderr_vswitch &
+if [ $ARG_TCPDUMP_ARGS_INDEX -ne -1 ]; then
+	sudo ip netns exec "$ARG_ROUTE_NAME" tcpdump --interface vswitch ${@:$ARG_TCPDUMP_ARGS_INDEX} -s 65535 > "$ARG_DUMP_DIR"/stdout_vswitch 2>"$ARG_DUMP_DIR"/stderr_vswitch &
+else
+	sudo ip netns exec "$ARG_ROUTE_NAME" tcpdump --interface vswitch -s 65535 > "$ARG_DUMP_DIR"/stdout_vswitch 2>"$ARG_DUMP_DIR"/stderr_vswitch &
+fi
 
 for i in $(seq $ARG_NUM); do
 	namespaceName="$ARG_PREFIX$i"
 	vethInName="$namespaceName"_in
 	vethOutName="$namespaceName"_out
 
-	sudo ip netns exec "$namespaceName" tcpdump --interface "$vethInName" ${@:$ARG_TCPDUMP_ARGS_INDEX} -s 65535 > "$ARG_DUMP_DIR"/stdout_"$vethInName" 2>"$ARG_DUMP_DIR"/stderr_"$vethInName" &
-	sudo ip netns exec "$ARG_ROUTE_NAME" tcpdump --interface "$vethOutName" ${@:$ARG_TCPDUMP_ARGS_INDEX} -s 65535 > "$ARG_DUMP_DIR"/stdout_"$vethOutName" 2>"$ARG_DUMP_DIR"/stderr_"$vethOutName" &
+	if [ $ARG_TCPDUMP_ARGS_INDEX -ne -1 ]; then
+		sudo ip netns exec "$namespaceName" tcpdump --interface "$vethInName" ${@:$ARG_TCPDUMP_ARGS_INDEX} -s 65535 > "$ARG_DUMP_DIR"/stdout_"$vethInName" 2>"$ARG_DUMP_DIR"/stderr_"$vethInName" &
+		sudo ip netns exec "$ARG_ROUTE_NAME" tcpdump --interface "$vethOutName" ${@:$ARG_TCPDUMP_ARGS_INDEX} -s 65535 > "$ARG_DUMP_DIR"/stdout_"$vethOutName" 2>"$ARG_DUMP_DIR"/stderr_"$vethOutName" &
+	else
+		sudo ip netns exec "$namespaceName" tcpdump --interface "$vethInName" -s 65535 > "$ARG_DUMP_DIR"/stdout_"$vethInName" 2>"$ARG_DUMP_DIR"/stderr_"$vethInName" &
+		sudo ip netns exec "$ARG_ROUTE_NAME" tcpdump --interface "$vethOutName" -s 65535 > "$ARG_DUMP_DIR"/stdout_"$vethOutName" 2>"$ARG_DUMP_DIR"/stderr_"$vethOutName" &
+	fi
 done
